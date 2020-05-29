@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<h1 style = "text-align:center; color:black; font-family: sans-serif"><bold> Alaska Population Density, 2018 </bold></h1>
+<svg width="960" height="600"></svg>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<script src="https://d3js.org/topojson.v2.min.js"></script>
+    <div id="toggleContainer">
+        <table>
+            <tr>
+                <td><label class="switch">
+                    <input id="state_toggle" type="checkbox">
+                    <div class="slider round"></div>
+                </label></td>
+                <td>Toggle State Boundary</td>
+            </tr>
+            <tr>
+                <td><label class="switch">
+                    <input id="tract_toggle" type="checkbox">
+                    <div class="slider round"></div>
+                </label></td>
+                <td>Toggle Census Tract Boundary</td>
+            </tr>
+            <tr>
+                <td><label class="switch">
+                    <input id="color_toggle" type="checkbox">
+                    <div class="slider round"></div>
+                </label></td>
+                <td>Change Legend Color</td>
+            </tr>
+        </table>
+    </div>
+
+<body>
+    <p style = "color:black; font-family: sans-serif">
+    <a href="https://github.com/bmatthuss/CSE163-Asg10-GeoMapping">Github Linkd</a>
+    <br>Brandon Huss
+    <br>Instructor: Suresh Lodha
+    <br>CSE 163: Data Programming for Visualization2020
+    </p>
+    <h4> Sources: </h4>
+      <li><a href="https://www2.census.gov/geo/tiger/GENZ2018/shp/">Alaska Census Data 2018</a></li>
+      <li><a href="https://medium.com/@mbostock/command-line-cartography-part-1-897aa8f8ca2c">Mike Bostock Command Line Cartography</a></li>
+</body>
+
+<script>
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var path = d3.geoPath();
+
+var color = d3.scaleThreshold()
+    .domain([1, 10, 50, 200, 500, 1000, 2000, 4000])
+    .range(d3.schemeOrRd[9]);
+
+var alt_color = d3.scaleThreshold()
+    .domain([1, 10, 50, 200, 500, 1000, 2000, 4000])
+    .range(d3.schemeBuPu[9]);
+    
+var x = d3.scaleSqrt()
+    .domain([0, 4500])
+    .rangeRound([440, 950]);
+
+var g = svg.append("g")
+    .attr("class", "key")
+    .attr("transform", "translate(0,550)");
+
+// Color bands in legend
+g.selectAll("rect")
+  .data(color.range().map(function(d) {
+      d = color.invertExtent(d);
+      if (d[0] == null) d[0] = x.domain()[0];
+      if (d[1] == null) d[1] = x.domain()[1];
+      return d;
+    }))
+  .enter().append("rect")
+    .attr("height", 8)
+    .attr("x", function(d) { return x(d[0]); })
+    .attr("width", function(d) { return x(d[1]) - x(d[0]); })
+    .attr("fill", function(d) { return color(d[0]); })
+    .attr("class", "bandColor");
+
+g.append("text")
+    .attr("class", "caption")
+    .attr("x", x.range()[0])
+    .attr("y", -6)
+    .attr("fill", "#000")
+    .attr("text-anchor", "start")
+    .attr("font-weight", "bold")
+    .text("Population per square mile");
+
+g.call(d3.axisBottom(x)
+    .tickSize(13)
+    .tickValues(color.domain()))
+  .select(".domain")
+    .remove();
+    
+d3.json("ak.json").then(function(topology) {
+d3.json("ak-state-boundary.json").then(function(state) {
+d3.json("ak-tract-boundary.json").then(function(tract) {
+    
+  // Color fill
+  svg.append("g")
+    .selectAll("path")
+    .data(topojson.feature(topology, topology.objects.tracts).features)
+    .enter().append("path")
+      .attr("fill", function(d) { return color(d.properties.density); })
+      .attr("d", path)
+      .attr("class", "legendColor")
+      .attr("transform", "translate(0,-200)");
+
+  var stateCheckbox = document.querySelector('input[id="state_toggle"]');
+  var tractCheckbox = document.querySelector('input[id="tract_toggle"]');
+  var colorCheckbox = document.querySelector('input[id="color_toggle"]');
+    
+  // County Borders
+  var county = svg.append("path")
+      .datum(topojson.feature(topology, topology.objects.counties))
+      .attr("fill", "none")
+      .attr("stroke", "#000")
+      .attr("stroke-opacity", 0.3)
+      .attr("d", path)
+      .attr("class", "countyBorder")
+      .attr("visibility", "visible")
+      .attr("transform", "translate(0,-200)");
+    
+  // State Borders
+  svg.append("path")
+      .datum(topojson.feature(state, state.objects.counties))
+      .attr("fill", "none")
+      .attr("stroke", "#000")
+      .attr("stroke-opacity", 0.3)
+      .attr("d", path)
+      .attr("class", "stateBorder")
+      .attr("visibility", "hidden")
+      .attr("transform", "translate(0,-200)");
+    
+  // Tract Borders
+  svg.append("path")
+      .datum(topojson.feature(tract, tract.objects.tracts))
+      .attr("fill", "none")
+      .attr("stroke", "#000")
+      .attr("stroke-opacity", 0.3)
+      .attr("d", path)
+      .attr("class", "tractBorder")
+      .attr("visibility", "hidden")
+      .attr("transform", "translate(0,-200)");
+
+    stateCheckbox.onchange = function() {
+      if(this.checked) {
+        d3.selectAll(".stateBorder").attr("visibility", "visible");
+      } else {
+        d3.selectAll(".stateBorder").attr("visibility", "hidden");
+      }
+    };
+
+    tractCheckbox.onchange = function() {
+      if(this.checked) {
+        d3.selectAll(".tractBorder").attr("visibility", "visible");
+        d3.selectAll(".countyBorder").attr("visibility", "hidden");
+      } else {
+        d3.selectAll(".tractBorder").attr("visibility", "hidden");
+        d3.selectAll(".countyBorder").attr("visibility", "visible");
+      }
+    };
+    
+    colorCheckbox.onchange = function() {
+      if(this.checked) {
+        d3.selectAll(".legendColor").attr("fill", function(d) { return alt_color(d.properties.density); })
+        d3.selectAll(".bandColor").attr("fill", function(d) { return alt_color(d[0]); })
+      } else {
+        d3.selectAll(".legendColor").attr("fill", function(d) { return color(d.properties.density); })
+        d3.selectAll(".bandColor").attr("fill", function(d) { return color(d[0]); })
+      }
+    };
+});
+});
+});
+    
+</script>
